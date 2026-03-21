@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Environment variables (never commit real secrets)
+.env
+
+# Logs
+*.log
+
+# macOS metadata
+.DS_Store
+
+# Editor directories
+.vscode/
+.idea/
