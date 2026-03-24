@@ -9,6 +9,7 @@ import express from 'express';
 import cors from 'cors';
 import requestLogger from './utils/logger.js';
 import analysisRoutes from './routes/analysis.routes.js';
+import authRoutes from './routes/auth.routes.js';
 
 const app = express();
 
@@ -43,6 +44,9 @@ app.get('/health', (_req, res) => {
 
 // Mount analysis routes under /analysis
 app.use('/analysis', analysisRoutes);
+
+// Mount auth routes under /auth
+app.use('/auth', authRoutes);
 
 // ---------------------------------------------------------------------------
 // 404 handler — must come AFTER all valid routes
