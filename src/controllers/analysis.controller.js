@@ -9,7 +9,16 @@ import { analyseContent } from '../services/analysis.service.js';
 /**
  * POST /analysis
  *
- * Expects a JSON body:
+ * Expects a JSON body (from frontend):
+ * {
+ *   "title":       string,
+ *   "description": string,
+ *   "views":       number,
+ *   "likes":       number,
+ *   "watchTime":   number
+ * }
+ *
+ * Or (legacy format):
  * {
  *   "title":       string,
  *   "description": string,
@@ -22,50 +31,71 @@ import { analyseContent } from '../services/analysis.service.js';
  *
  * Responds with:
  * {
- *   "score":       number,
- *   "insights":    string[],
- *   "suggestions": string[]
+ *   "id":              string (uuid),
+ *   "score":           number,
+ *   "engagementRate":  number,
+ *   "insights":        string[],
+ *   "suggestions":     string[]
  * }
  *
  * @type {import('express').RequestHandler}
  */
 export const analyseVideo = (req, res, next) => {
   try {
-    const { title, description, metrics } = req.body;
+    const { title, description, views, likes, watchTime, metrics } = req.body;
+
+    // Support both formats: flat and nested metrics
+    let flatMetrics = { views, likes, watchTime };
+    if (!views && metrics) {
+      flatMetrics = metrics;
+    }
 
     // --- Input validation ---
     if (!title || typeof title !== 'string') {
       return res.status(400).json({ error: '`title` must be a non-empty string.' });
     }
 
-    if (!description || typeof description !== 'string') {
-      return res.status(400).json({ error: '`description` must be a non-empty string.' });
+    if (description && typeof description !== 'string') {
+      return res.status(400).json({ error: '`description` must be a string.' });
     }
 
-    if (!metrics || typeof metrics !== 'object') {
-      return res.status(400).json({ error: '`metrics` must be an object.' });
+    const { views: v, likes: l, watchTime: w } = flatMetrics;
+
+    if (typeof v !== 'number' || v < 0) {
+      return res.status(400).json({ error: '`views` must be a non-negative number.' });
     }
 
-    const { views, likes, watchTime } = metrics;
-
-    if (typeof views !== 'number' || views < 0) {
-      return res.status(400).json({ error: '`metrics.views` must be a non-negative number.' });
+    if (typeof l !== 'number' || l < 0) {
+      return res.status(400).json({ error: '`likes` must be a non-negative number.' });
     }
 
-    if (typeof likes !== 'number' || likes < 0) {
-      return res.status(400).json({ error: '`metrics.likes` must be a non-negative number.' });
-    }
-
-    if (typeof watchTime !== 'number' || watchTime < 0) {
-      return res.status(400).json({ error: '`metrics.watchTime` must be a non-negative number.' });
+    if (typeof w !== 'number' || w < 0) {
+      return res.status(400).json({ error: '`watchTime` must be a non-negative number.' });
     }
 
     // --- Delegate to service ---
-    const result = analyseContent({ title, description, metrics });
+    const result = analyseContent({
+      title,
+      description: description || '',
+      metrics: flatMetrics,
+    });
 
-    return res.status(200).json(result);
+    // Add ID and engagement rate for frontend
+    const engagementRate = v > 0 ? l / v : 0;
+    const response = {
+      id: generateId(),
+      ...result,
+      engagementRate,
+    };
+
+    return res.status(200).json(response);
   } catch (err) {
     // Forward unexpected errors to the global error handler
     next(err);
   }
 };
+
+// Simple UUID-like ID generator for analysis results
+function generateId() {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+}
